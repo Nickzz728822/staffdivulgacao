@@ -1,359 +1,244 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
- <meta charset="UTF-8" />
- <title>Site de Teste</title>
- <meta name="viewport" content="width=device-width, initial-scale=1" />
- <style>
- * {
- box-sizing: border-box;
- margin: 0;
- padding: 0;
- font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
- sans-serif;
- }
+import React, { useState } from 'react';
+import { useAdmin } from '@/contexts/AdminContext';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Save, X, Edit2, Plus, Upload, Image as ImageIcon } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
- body {
- background: #f4f4f5;
- color: #111827;
- display: flex;
- min-height: 100vh;
- align-items: center;
- justify-content: center;
- padding: 16px;
- }
+const AdminPanel = () => {
+  const { 
+    templates, deleteTemplate, updateTemplate, addTemplate,
+    effects, deleteEffect, updateEffect, addEffect,
+    presets, deletePreset, updatePreset, addPreset,
+    uploadImage
+  } = useAdmin();
+  
+  const { toast } = useToast();
 
- .card {
- background: #ffffff;
- border-radius: 12px;
- padding: 24px 24px 20px;
- max-width: 480px;
- width: 100%;
- box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
- border: 1px solid #e5e7eb;
- }
+  const EditableTable = ({ items, onDelete, onUpdate }) => {
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({});
+    const [uploading, setUploading] = useState(false);
 
- .badge {
- display: inline-flex;
- align-items: center;
- gap: 6px;
- padding: 4px 10px;
- border-radius: 999px;
- background: #eef2ff;
- color: #4f46e5;
- font-size: 12px;
- font-weight: 600;
- letter-spacing: 0.03em;
- text-transform: uppercase;
- margin-bottom: 12px;
- }
+    const startEdit = (item) => {
+      setEditingId(item.id);
+      setEditForm(item);
+    };
 
- .badge-dot {
- width: 7px;
- height: 7px;
- border-radius: 999px;
- background: #22c55e;
- }
+    const cancelEdit = () => {
+      setEditingId(null);
+      setEditForm({});
+      setUploading(false);
+    };
 
- h1 {
- font-size: 24px;
- margin-bottom: 8px;
- }
+    const saveEdit = () => {
+      onUpdate(editingId, editForm);
+      setEditingId(null);
+      toast({
+        title: "Item atualizado",
+        description: "As alterações foram salvas com sucesso."
+      });
+    };
 
- p {
- color: #6b7280;
- font-size: 14px;
- margin-bottom: 16px;
- }
+    const handleImageUpload = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
- .divider {
- border-top: 1px dashed #e5e7eb;
- margin: 16px 0;
- }
+      setUploading(true);
+      try {
+        const base64 = await uploadImage(file);
+        setEditForm(prev => ({ ...prev, imageUrl: base64 }));
+        toast({
+          title: "Imagem carregada",
+          description: "Imagem adicionada com sucesso."
+        });
+      } catch (error) {
+        toast({
+          title: "Erro no upload",
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setUploading(false);
+      }
+    };
 
- .test-section {
- margin-bottom: 14px;
- }
+    return (
+      <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-white/5 text-gray-400 text-sm">
+            <tr>
+              <th className="p-4 w-24">Imagem</th>
+              <th className="p-4">Nome</th>
+              <th className="p-4">Descrição</th>
+              <th className="p-4 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/10">
+            {items.map((item) => (
+              <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                <td className="p-4 align-top">
+                  {editingId === item.id ? (
+                    <div className="space-y-2">
+                      <div className="w-16 h-16 rounded bg-black/40 flex items-center justify-center overflow-hidden border border-white/10">
+                        {editForm.imageUrl ? (
+                          <img src={editForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-6 h-6 text-gray-500" />
+                        )}
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          id={`file-upload-${item.id}`}
+                          disabled={uploading}
+                        />
+                        <label
+                          htmlFor={`file-upload-${item.id}`}
+                          className="block w-full text-center px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs rounded cursor-pointer transition-colors"
+                        >
+                          {uploading ? '...' : 'Upload'}
+                        </label>
+                      </div>
+                      {editForm.imageUrl && (
+                        <button
+                          onClick={() => setEditForm(prev => ({ ...prev, imageUrl: '' }))}
+                          className="block w-full text-center text-[10px] text-red-400 hover:text-red-300"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded bg-black/20 flex items-center justify-center overflow-hidden border border-white/10">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-gray-600" />
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td className="p-4 align-top">
+                  {editingId === item.id ? (
+                    <input 
+                      className="bg-black/20 border border-purple-500/50 rounded px-2 py-1 text-white w-full"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                    />
+                  ) : (
+                    <span className="text-white font-medium block">{item.name}</span>
+                  )}
+                </td>
+                <td className="p-4 align-top">
+                  {editingId === item.id ? (
+                    <textarea 
+                      className="bg-black/20 border border-purple-500/50 rounded px-2 py-1 text-white w-full resize-y min-h-[80px]"
+                      value={editForm.description || ''}
+                      onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-sm line-clamp-3">{item.description || 'Sem descrição'}</span>
+                  )}
+                </td>
+                <td className="p-4 text-right align-top">
+                  <div className="flex justify-end gap-2">
+                    {editingId === item.id ? (
+                      <>
+                        <Button size="sm" onClick={saveEdit} className="bg-green-600 hover:bg-green-700 h-8 w-8 p-0">
+                          <Save className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 w-8 p-0">
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(item)} className="text-purple-400 hover:text-purple-300 h-8 w-8 p-0">
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => {
+                            if(confirm('Tem certeza que deseja excluir este item?')) {
+                              onDelete(item.id);
+                              toast({ title: "Item excluído", variant: "destructive" });
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-300 h-8 w-8 p-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
- .label {
- font-size: 13px;
- font-weight: 600;
- margin-bottom: 6px;
- color: #374151;
- }
+  const AddButton = ({ onClick, label }) => (
+    <Button 
+      onClick={onClick}
+      className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 mb-4"
+    >
+      <Plus className="w-4 h-4 mr-2" />
+      {label}
+    </Button>
+  );
 
- .input-row {
- display: flex;
- gap: 8px;
- margin-bottom: 6px;
- }
+  return (
+    <div className="space-y-6">
+      <Tabs defaultValue="templates" className="w-full">
+        <TabsList className="bg-white/5 border border-white/10 p-1">
+          <TabsTrigger value="templates" className="data-[state=active]:bg-purple-600">Modelos</TabsTrigger>
+          <TabsTrigger value="effects" className="data-[state=active]:bg-purple-600">Efeitos</TabsTrigger>
+          <TabsTrigger value="presets" className="data-[state=active]:bg-purple-600">Presets</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="templates" className="mt-6">
+          <AddButton 
+            label="Adicionar Modelo" 
+            onClick={() => {
+              addTemplate({ name: 'Novo Modelo', description: 'Descrição aqui', category: 'Intro', imageUrl: '' });
+              toast({ title: "Novo modelo criado", description: "Edite o item para adicionar detalhes e imagem." });
+            }} 
+          />
+          <EditableTable items={templates} onDelete={deleteTemplate} onUpdate={updateTemplate} type="template" />
+        </TabsContent>
+        
+        <TabsContent value="effects" className="mt-6">
+          <AddButton 
+            label="Adicionar Efeito" 
+            onClick={() => {
+              addEffect({ name: 'Novo Efeito', description: 'Descrição aqui', effect_type: 'Desfoque', imageUrl: '' });
+              toast({ title: "Novo efeito criado", description: "Edite o item para adicionar detalhes e imagem." });
+            }} 
+          />
+          <EditableTable items={effects} onDelete={deleteEffect} onUpdate={updateEffect} type="effect" />
+        </TabsContent>
 
- input[type="text"] {
- flex: 1;
- padding: 8px 10px;
- border-radius: 8px;
- border: 1px solid #d1d5db;
- font-size: 14px;
- outline: none;
- transition: border-color 0.15s, box-shadow 0.15s;
- }
+        <TabsContent value="presets" className="mt-6">
+          <AddButton 
+            label="Adicionar Preset" 
+            onClick={() => {
+              addPreset({ name: 'Novo Preset', brightness: 0, contrast: 0, saturation: 0, hue: 0, imageUrl: '' });
+              toast({ title: "Novo preset criado", description: "Edite o item para adicionar detalhes e imagem." });
+            }} 
+          />
+          <EditableTable items={presets} onDelete={deletePreset} onUpdate={updatePreset} type="preset" />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
 
- input[type="text"]:focus {
- border-color: #4f46e5;
- box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.16);
- }
-
- button {
- border: none;
- border-radius: 8px;
- padding: 8px 14px;
- font-size: 14px;
- font-weight: 600;
- cursor: pointer;
- background: #4f46e5;
- color: white;
- display: inline-flex;
- align-items: center;
- gap: 6px;
- transition: background 0.15s, transform 0.1s, box-shadow 0.1s;
- box-shadow: 0 8px 18px rgba(79, 70, 229, 0.25);
- white-space: nowrap;
- }
-
- button:hover {
- background: #4338ca;
- }
-
- button:active {
- transform: translateY(1px);
- box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35);
- }
-
- .chip-row {
- display: flex;
- flex-wrap: wrap;
- gap: 6px;
- margin-top: 6px;
- }
-
- .chip {
- padding: 4px 10px;
- border-radius: 999px;
- border: 1px solid #e5e7eb;
- font-size: 11px;
- color: #6b7280;
- background: #f9fafb;
- }
-
- .output {
- font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
- "Liberation Mono", "Courier New", monospace;
- font-size: 13px;
- background: #0f172a;
- color: #e5e7eb;
- border-radius: 8px;
- padding: 10px 12px;
- min-height: 32px;
- white-space: pre-wrap;
- word-break: break-word;
- }
-
- .output span.key {
- color: #a5b4fc;
- }
-
- .output span.value {
- color: #6ee7b7;
- }
-
- .footer {
- margin-top: 14px;
- display: flex;
- justify-content: space-between;
- align-items: center;
- font-size: 11px;
- color: #9ca3af;
- }
-
- .dot-status {
- width: 8px;
- height: 8px;
- border-radius: 999px;
- margin-right: 4px;
- }
-
- .dot-ok {
- background: #22c55e;
- }
-
- .dot-idle {
- background: #9ca3af;
- }
-
- .footer-right {
- display: flex;
- gap: 10px;
- align-items: center;
- }
-
- @media (max-width: 480px) {
- .card {
- padding: 20px 18px 18px;
- }
- h1 {
- font-size: 20px;
- }
- .input-row {
- flex-direction: column;
- }
- button {
- justify-content: center;
- }
- }
- </style>
-</head>
-<body>
- <main class="card">
- <div class="badge">
- <span class="badge-dot"></span>
- Ambiente de teste
- </div>
-
- <h1>Site simples para testes</h1>
- <p>
- Use este mini painel para testar formulários, eventos de clique e
- manipulação do DOM em um arquivo HTML único.
- </p>
-
- <div class="divider"></div>
-
- <section class="test-section">
- <div class="label">1. Teste de entrada de texto</div>
- <div class="input-row">
- <input
- type="text"
- id="inputTexto"
- placeholder="Digite qualquer coisa aqui…"
- />
- <button id="btnEcoar">
- <span>Ecoar</span>
- </button>
- </div>
- <div class="chip-row">
- <button type="button" class="chip" data-fill="Hostinger">
- Hostinger
- </button>
- <button type="button" class="chip" data-fill="Teste rápido">
- Teste rápido
- </button>
- <button type="button" class="chip" data-fill="12345">
- 12345
- </button>
- </div>
- </section>
-
- <section class="test-section">
- <div class="label">2. Estado da página (JSON simulado)</div>
- <div class="output" id="saida">
- <span class="key">status</span>: <span class="value">"aguardando entrada"</span>
- </div>
- </section>
-
- <div class="footer">
- <div>
- <span class="dot-status dot-idle"></span>
- <span id="statusTexto">Nenhuma interação ainda</span>
- </div>
- <div class="footer-right">
- <span id="timestamp"></span>
- </div>
- </div>
- </main>
-
- <script>
- // Elementos principais
- const inputTexto = document.getElementById("inputTexto");
- const btnEcoar = document.getElementById("btnEcoar");
- const chips = document.querySelectorAll(".chip[data-fill]");
- const saida = document.getElementById("saida");
- const statusTexto = document.getElementById("statusTexto");
- const timestamp = document.getElementById("timestamp");
- const dotStatus = document.querySelector(".dot-status");
-
- function atualizarRelogio() {
- const agora = new Date();
- // Mostra horário local simplificado
- timestamp.textContent = agora.toLocaleTimeString("pt-BR", {
- hour: "2-digit",
- minute: "2-digit",
- second: "2-digit",
- });
- }
-
- // Atualiza a cada segundo
- atualizarRelogio();
- setInterval(atualizarRelogio, 1000);
-
- function atualizarSaida(valor) {
- const tamanho = valor.length;
- const maiusculas = valor.toUpperCase();
- const reverso = valor.split("").reverse().join("");
-
- saida.innerHTML =
- '{\n <span class="key">"texto"</span>: <span class="value">"' +
- escapeHtml(valor) +
- '"</span>,\n' +
- ' <span class="key">"tamanho"</span>: <span class="value">' +
- tamanho +
- "</span>,\n" +
- ' <span class="key">"upper"</span>: <span class="value">"' +
- escapeHtml(maiusculas) +
- '"</span>,\n' +
- ' <span class="key">"reverso"</span>: <span class="value">"' +
- escapeHtml(reverso) +
- '"</span>\n}';
- }
-
- function atualizarStatus(texto, ativo) {
- statusTexto.textContent = texto;
- if (ativo) {
- dotStatus.classList.remove("dot-idle");
- dotStatus.classList.add("dot-ok");
- } else {
- dotStatus.classList.remove("dot-ok");
- dotStatus.classList.add("dot-idle");
- }
- }
-
- function escapeHtml(str) {
- return str
- .replace(/&/g, "&")
- .replace(/</g, "<")
- .replace(/>/g, ">");
- }
-
- btnEcoar.addEventListener("click", () => {
- const valor = inputTexto.value || "";
- atualizarSaida(valor);
- atualizarStatus("Última ação: botão Ecoar", true);
- });
-
- inputTexto.addEventListener("input", () => {
- atualizarSaida(inputTexto.value);
- atualizarStatus("Digitando…", true);
- });
-
- chips.forEach((chip) => {
- chip.addEventListener("click", () => {
- const valor = chip.getAttribute("data-fill") || "";
- inputTexto.value = valor;
- atualizarSaida(valor);
- atualizarStatus('Preenchido via chip: "' + valor + '"', true);
- });
- });
-
- // Inicializa saída com vazio
- atualizarSaida("");
- </script>
-</body>
-</html>
+export default AdminPanel;
